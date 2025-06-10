@@ -1,47 +1,61 @@
 {% extends 'blog/base.html' %}
 {% block main %}
-    <h1>Blog</h1>
+    <h1>
+        Blog
+        {% if category %}
+            <span class="badge badge-secondary">{{ category }}</span>
+        {% endif %}
+
+        {% if tag %}
+            <span class="badge badge-light"><i class="fas fa-tags"></i>
+                {{ tag }} ({{ tag.post_set.count }})</span>
+        {% endif %}
+    </h1>
     {% if post_list.exists %}
         {% for p in post_list %}
             <!-- Blog Post -->
-            <div class="card mb-4">
+            <div class="card mb-4" id="post-{{ p.pk }}">
                 {% if p.head_image %}
                     <img class="card-img-top" src="{{ p.head_image.url }}" alt="{{ p }} head image">
                 {% else %}
                     <img class="card-img-top" src="https://picsum.photos/seed/{{ p.id }}/800/200" alt="random_image">
                 {% endif %}
                 <div class="card-body">
+                    {% if p.category %}
+                        <span class="badge badge-secondary float-right">{{ p.category }}</span>
+                    {% else %}
+                        <span class="badge badge-secondary float-right">미분류</span>
+                    {% endif %}
+
                     <h2 class="card-title">{{ p.title }}</h2>
+
                     {% if p.hook %}
                         <h5 class="text-muted">{{ p.hook }}</h5>
                     {% endif %}
+
+                    {% if p.tags.exists %}
+                        <i class="fas fa-tags"></i>
+                        {% for tag in p.tags.iterator %}
+                            <a href="{{ tag.get_absolute_url }}">
+                                <span class="badge badge-pill badge-light">{{ tag.name }}</span>
+                            </a>
+                        {% endfor %}
+                        <br><br>
+                    {% endif %}
+
                     <p class="card-text">{{ p.content | truncatewords:45 }}</p>
                     <a href="{{ p.get_absolute_url }}" class="btn btn-primary">Read More &rarr;</a>
                 </div>
+
                 <div class="card-footer text-muted">
                     Posted on {{ p.create_at }} by
-                    <a href="#">작성자 : {{ p.author | upper }}</a>
+                    <a href="#">작성자 : {{ p.author.username|upper }}</a>
                 </div>
             </div>
         {% endfor %}
     {% else %}
         <h3>아직 게시물이 없습니다!</h3>
     {% endif %}
-    <!-- Blog Post -->
-    <div class="card mb-4">
-        <img class="card-img-top" src="http://placehold.it/750x300" alt="Card image cap">
-        <div class="card-body">
-            <h2 class="card-title">Post Title</h2>
-            <p class="card-text">Lorem ipsum dolor sit amet, consectetur adipisicing elit. Reiciendis
-                aliquid atque, nulla? Quos cum ex quis soluta, a laboriosam. Dicta expedita corporis animi
-                vero voluptate voluptatibus possimus, veniam magni quis!</p>
-            <a href="#" class="btn btn-primary">Read More &rarr;</a>
-        </div>
-        <div class="card-footer text-muted">
-            Posted on January 1, 2017 by
-            <a href="#">Start Bootstrap</a>
-        </div>
-    </div>
 
     <!-- Pagination -->
     <ul class="pagination justify-content-center mb-4">
