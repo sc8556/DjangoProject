@@ -1,0 +1,20 @@
+{% extends "blog/base_full_width.html" %}
+
+{% block head_title %}Edit Post - Blog{% endblock %}
+
+{% block main %}
+    <div id ='main-area'>
+        <h1 id="main-area">Edit Post - Blog</h1>
+        <hr/>
+        <form method="post" enctype="multipart/form-data">{% csrf_token %}
+            <table>
+                {{ form }}
+                <tr>
+                    <th><label for="id_tag_str">Tags :</label></th>
+                    <th><input type="text" name="tag_str" id="id_tag_str" value="{{ tags_str_default }}"></th>
+                </tr>
+            </table>
+            <button type="submit" class="btn btn-primary float-right">Summit</button>
+        </form>
+    </div>
+{% endblock %}
