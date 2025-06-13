@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import password_changed
 from django.test import TestCase, Client
 from bs4 import BeautifulSoup
-from .models import Post, Category, Tag
+from .models import Post, Category, Tag, Comment
 
 
 # Create your tests here.
@@ -56,6 +56,12 @@ class TestView(TestCase):
         self.post_003.tags.add(self.tag_hello)
         self.post_003.tags.add(self.tag_python_kor)
         self.post_003.tags.add(self.tag_python)
+
+        self.comment_001 = Comment.objects.create(
+            post=self.post_001,
+            author=self.user_obama,
+            content='첫 번째 댓글입니다.'
+        )
 
 
     def navbar_test(self, soup):
@@ -130,41 +136,35 @@ class TestView(TestCase):
         self.assertIn("아직 게시물이 없습니다", main_area.text)
 
     def test_post_detail(self):
-        # 1.1 포스트가 하나 있다.
-        post_001 = Post.objects.create(
-            title = '첫 번째 포스트입니다.',
-            content = 'Hello World. We are the world.',
-            author = self.user_trump,
-            category=self.category_programming,
-        )
+        # setUp()에서 만든 post와 comment를 재사용
+        post_001 = self.post_001
 
-        # 1.2 그 포스트의 url은 'blog/1'이다
-        self.assertEqual(post_001.get_absolute_url(), f'/blog/{post_001.pk}/')
-
-        # 1. 첫 번째 포스트의 상세 페이지 테스트
-        # 1.1 첫 번째 포스트의 url로 접근하면 정상적으로 작동한다.
         response = self.client.get(post_001.get_absolute_url())
         self.assertEqual(response.status_code, 200)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # 1.2 post-list 페이지와 똑같은 네비게이션 바가 있다.
         self.navbar_test(soup)
         self.category_card_test(soup)
 
-        # 1.3 첫 번째 포스트 제목이 웹 브라우저 탭 타이틀에 들어있다
         self.assertIn(post_001.title, soup.title.text)
 
-        # 1.4 첫 번째 포스트의 제목[title]이 포스트 영역[post-area]에 있다
-        main_area = soup.find('div',id='main-area')
-        post_area = soup.find('div',id='post-area')
+        main_area = soup.find('div', id='main-area')
+        post_area = soup.find('div', id='post-area')
+
         self.assertIn(post_001.title, post_area.text)
-        self.assertIn(self.user_trump.username.upper(), post_area.text)
-
-        # 1.5 첫 번째 post의 작성자[author]가 포스트 영역[post-area]에 있다.
+        self.assertIn(post_001.author.username.upper(), post_area.text)
         self.assertIn(post_001.author.username.upper(), main_area.text)
-
-        # 1.6 첫 번째 post의 내용[content]이 포스트 영역[popst-area] 에 있다.
         self.assertIn(post_001.content, post_area.text)
+
+        # 댓글 영역 검사
+        comments_area = soup.find('div', id='comment-area')
+        self.assertIsNotNone(comments_area, "댓글 영역(comment-area)이 없습니다.")
+
+        comment_001_area = comments_area.find('div', id=f'comment-{self.comment_001.pk}')
+        self.assertIsNotNone(comment_001_area, f"댓글 comment-{self.comment_001.pk}이 없습니다.")
+
+        self.assertIn(self.comment_001.author.username, comment_001_area.text)
+        self.assertIn(self.comment_001.content, comment_001_area.text)
 
     def category_card_test(self,soup):
             categories_card = soup.find('div',id='categories-card')
@@ -231,7 +231,7 @@ class TestView(TestCase):
         main_area = soup.find('div',id='main-area')
         self.assertIn("Create New Post", main_area.text)
 
-        tag_str_input = main_area.find('input', id='id_tag_str')
+        tag_str_input = main_area.find('input', id='id_tags_str')
         self.assertTrue(tag_str_input)
 
         self.client.post(
@@ -279,7 +279,7 @@ class TestView(TestCase):
         main_area = soup.find('div',id='main-area')
         self.assertIn("Edit Post", main_area.text.strip())
 
-        tag_str_input = main_area.find('input', id='id_tag_str')
+        tag_str_input = main_area.find('input', id='id_tags_str')
         self.assertTrue(tag_str_input)
         self.assertIn("파이썬 공부; python", tag_str_input.attrs['value'])
 
@@ -302,3 +302,79 @@ class TestView(TestCase):
         self.assertIn("파이썬 공부", main_area.text.strip())
         self.assertIn("한글 태그", main_area.text.strip())
         self.assertIn("some tag", main_area.text.strip())
+
+    def test_comment_form(self):
+        self.assertEqual(Comment.objects.count(), 1)
+        self.assertEqual(self.post_001.comment_set.count(), 1)
+
+        # 🔹 1. 로그인하지 않은 상태
+        response = self.client.get(self.post_001.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        comment_area = soup.find('div', id='comment-area')
+        self.assertIn("Log in and leave a comment", comment_area.text)
+        self.assertIsNone(comment_area.find("form", id="comment-form"))
+
+        # 🔹 2. 로그인 후
+        self.client.login(username='obama', password='somepassword')
+
+        response = self.client.get(self.post_001.get_absolute_url())
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        comment_area = soup.find('div', id='comment-area')
+        self.assertNotIn("Log in and leave a comment", comment_area.text)
+
+        comment_form = comment_area.find('form', id='comment-form')
+        self.assertIsNotNone(comment_form.find("textarea", id="id_content"))
+
+        from django.urls import reverse
+        url = reverse('new_comment', kwargs={'pk': self.post_001.pk})
+        response = self.client.post(
+            url,
+            {
+                "content": "오바마의 댓글입니다.",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Comment.objects.count(), 2)
+        self.assertEqual(self.post_001.comment_set.count(), 2)
+
+        new_comment = Comment.objects.last()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        comment_area = soup.find('div', id='comment-area')
+        new_comment_div = comment_area.find('div', id=f'comment-{new_comment.pk}')
+        self.assertIn("obama", new_comment_div.text)
+        self.assertIn("오바마의 댓글입니다.", new_comment_div.text)
+
+    def test_comment_update(self):
+        comment_by_trump = Comment.objects.create(
+            post=self.post_001, author=self.user_trump, content="트럼프 댓글입니다."
+        )
+
+        response = self.client.get(self.post_001.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        comment_area = soup.find('div', id='comment-area')
+
+        # 로그인 전에는 수정 버튼 안 보여야 함
+        self.assertIsNone(comment_area.find("a", id=f"comment-{comment_by_trump.pk}-update-btn"))
+
+        # 로그인 후
+        self.client.login(username=self.user_trump.username, password="somepassword")
+        response = self.client.get(self.post_001.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        comment_area = soup.find('div', id='comment-area')
+        comment_update_btn = comment_area.find("a", id=f"comment-{comment_by_trump.pk}-update-btn")
+        self.assertIsNotNone(comment_update_btn)
+        self.assertIn("edit", comment_update_btn.text)
+        self.assertEqual(comment_update_btn.attrs["href"], f"/blog/update_comment/{comment_by_trump.pk}")
+
+
+

@@ -33,11 +33,10 @@
                     {% endif %}
 
                     <h2 class="card-title">{{ p.title }}</h2>
-
                     {% if p.hook %}
                         <h5 class="text-muted">{{ p.hook }}</h5>
                     {% endif %}
-
+                    <p class="card-text">{{ p.get_content_markdown | truncatewords_html:45 | safe }}</p>
                     {% if p.tags.exists %}
                         <i class="fas fa-tags"></i>
                         {% for tag in p.tags.iterator %}
